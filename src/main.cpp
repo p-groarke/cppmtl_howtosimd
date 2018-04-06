@@ -114,10 +114,8 @@ void simple_replace(char (&data)[N], char original, char replacement) {
 	}
 }
 
-const size_t num_benchmarks = 100'000;
-int main(int, char**) {
-
-	// Output files for diff.
+// Output files for diff.
+void do_diffs() {
 	{
 		std::replace(std::begin(text), std::end(text), 'e', '1');
 		std::ofstream f{ "std_replace.txt" };
@@ -135,6 +133,10 @@ int main(int, char**) {
 		}
 		simd_replace(text, '1', 'e');
 	}
+}
+
+void do_tests() {
+	const size_t num_benchmarks = 100'000;
 
 	// Trivial replace function.
 	bench::start();
@@ -162,6 +164,12 @@ int main(int, char**) {
 	}
 	bench::stop("simd replace", stderr);
 	printf("%s\n", text);
+}
+
+int main(int, char**) {
+
+	do_diffs();
+	do_tests();
 
 	return 0;
 }
