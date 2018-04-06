@@ -114,15 +114,6 @@ void simple_replace(char (&data)[N], char original, char replacement) {
 	}
 }
 
-template <size_t N>
-void simple_replace_hints(char (&data)[N], char original, char replacement) {
-#pragma clang loop vectorize(enable)
-	for (size_t i = 0; i < N; ++i) {
-		if (data[i] == original)
-			data[i] = replacement;
-	}
-}
-
 const size_t num_benchmarks = 100'000;
 int main(int, char**) {
 
@@ -152,15 +143,6 @@ int main(int, char**) {
 		simple_replace(text, '1', 'e');
 	}
 	bench::stop("simple replace", stderr);
-	printf("%s\n", text);
-
-	// Trivial replace function with clang hints.
-	bench::start();
-	for (size_t i = 0; i < num_benchmarks; ++i) {
-		simple_replace_hints(text, 'e', '1');
-		simple_replace_hints(text, '1', 'e');
-	}
-	bench::stop("simple replace with hint", stderr);
 	printf("%s\n", text);
 
 	// std::replace
