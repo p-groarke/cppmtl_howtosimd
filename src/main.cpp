@@ -1,7 +1,9 @@
 #include "text.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <fstream>
+#include <thread>
 
 #include <bench_util/bench_util.h> // Timers
 #include <emmintrin.h> // SSE2
@@ -83,7 +85,13 @@ void simd_replace(char (&data)[N], char original, char replacement) {
 	if (N - i == 0)
 		return;
 
-	/* Final pass with remainder data that doesn't fill 128bits. */
+	/**
+	 * Final pass with remainder data that doesn't fill 128bits.
+	 *
+	 * Don't store the full data as we will write in unrelated memory.
+	 * Store modified data in appropriately sized array, then only
+	 * extract the valid elements.
+	 **/
 	char temp_storage[16] = {};
 	for (size_t j = 0; j < N - i; ++j) {
 		temp_storage[j] = data[i + j];
@@ -95,11 +103,6 @@ void simd_replace(char (&data)[N], char original, char replacement) {
 	xmm_result = _mm_mullo_epi8(xmm_result, xmm_diff);
 	xmm_result = _mm_add_epi8(xmm_result, xmm_str);
 
-	/**
-	 * Don't store the full data as we will write in unrelated memory.
-	 * Store modified data in appropriately sized array, then only
-	 * extract the string elements.
-	 **/
 	_mm_storeu_si128((__m128i*)(&temp_storage), xmm_result);
 	for (size_t j = 0; j < N - i; ++j) {
 		data[i + j] = temp_storage[j];
@@ -107,7 +110,7 @@ void simd_replace(char (&data)[N], char original, char replacement) {
 }
 
 template <size_t N>
-void simple_replace(char (&data)[N], char original, char replacement) {
+void boring_replace(char (&data)[N], char original, char replacement) {
 	for (size_t i = 0; i < N; ++i) {
 		if (data[i] == original)
 			data[i] = replacement;
@@ -135,16 +138,19 @@ void do_diffs() {
 	}
 }
 
-void do_tests() {
-	const size_t num_benchmarks = 100'000;
+void do_tests_bigdata() {
+	using namespace std::chrono_literals;
+	const size_t num_benchmarks = 200'000;
+	fprintf(stderr, "\n");
+	bench::title("Big data : First 2 chapters of Moby Dick", stderr);
 
 	// Trivial replace function.
 	bench::start();
 	for (size_t i = 0; i < num_benchmarks; ++i) {
-		simple_replace(text, 'e', '1');
-		simple_replace(text, '1', 'e');
+		boring_replace(text, 'e', '1');
+		boring_replace(text, '1', 'e');
 	}
-	bench::stop("simple replace", stderr);
+	bench::stop("boring replace", stderr);
 	printf("%s\n", text);
 
 	// std::replace
@@ -156,6 +162,10 @@ void do_tests() {
 	bench::stop("std::replace", stderr);
 	printf("%s\n", text);
 
+	fprintf(stderr, "\ndrum roll...\n");
+	std::this_thread::sleep_for(4s);
+	fprintf(stderr, "just  kidding :P\n\n");
+
 	// SIMD replace
 	bench::start();
 	for (size_t i = 0; i < num_benchmarks; ++i) {
@@ -166,10 +176,36 @@ void do_tests() {
 	printf("%s\n", text);
 }
 
+void do_tests_smalldata() {
+	const size_t num_benchmarks = 100'000'000;
+	fprintf(stderr, "\n");
+	bench::title("Small data : 15 character string", stderr);
+
+	// std::replace
+	bench::start();
+	for (size_t i = 0; i < num_benchmarks; ++i) {
+		std::replace(std::begin(text_small), std::end(text_small), 'e', '1');
+		std::replace(std::begin(text_small), std::end(text_small), '1', 'e');
+	}
+	bench::stop("std::replace", stderr);
+	printf("%s\n", text_small);
+
+	// SIMD replace
+	bench::start();
+	for (size_t i = 0; i < num_benchmarks; ++i) {
+		simd_replace(text_small, '1', 'e');
+		simd_replace(text_small, 'e', '1');
+	}
+	bench::stop("simd replace", stderr);
+	printf("%s\n", text_small);
+}
+
 int main(int, char**) {
 
 	do_diffs();
-	do_tests();
+	do_tests_bigdata();
+	do_tests_smalldata();
 
+	fprintf(stderr, "\n");
 	return 0;
 }
